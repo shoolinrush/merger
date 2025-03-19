@@ -76,9 +76,12 @@ if uploaded_files:
         assigned_standard = []
         duplicate_assigned = []
         for col in original_columns:
-            selected = st.selectbox(f"Assign '{col}' to:", ["(Leave Blank)"] + STANDARD_COLUMNS, 
-                                    index=(STANDARD_COLUMNS.index(mapping_suggestion[col]) + 1) if mapping_suggestion[col] in STANDARD_COLUMNS else 0, 
-                                    key=f"{file.name}_mapping_{col}")
+            selected = st.selectbox(
+                f"Assign '{col}' to:", 
+                ["(Leave Blank)"] + STANDARD_COLUMNS, 
+                index=(STANDARD_COLUMNS.index(mapping_suggestion[col]) + 1) if mapping_suggestion[col] in STANDARD_COLUMNS else 0,
+                key=f"{file.name}_mapping_{col}"
+            )
             final_mapping[col] = selected
             if selected != "(Leave Blank)":
                 if selected in assigned_standard:
@@ -90,23 +93,37 @@ if uploaded_files:
             st.error(f"Duplicate assignment in {file.name}: {', '.join(duplicate_assigned)}. Please fix them.")
         company_selection = st.selectbox(f"Select COMPANY for {file.name}:", list(COMPANY_OPTIONS.keys()), key=f"{file.name}_company")
         file_data.append((df, final_mapping, company_selection, file.name))
+
     if duplicate_assignment_errors:
         st.error("Please resolve all duplicate column assignments before merging.")
     else:
         if st.button("Merge Files 🚀"):
-            merged_dfs = []
+            # Apply stock filtering conditions
+            stock_conditions = {
+                "Adarsh": 10,
+                "Adhya": 2,
+                "UDH": 0,       # All stock is okay
+                "RUPA": 5,
+                "Prakash Delhi": 4,
+                "Prakash Noida": 4,
+                "IBD": 3,
+                "GBD": 5,
+                "ECP": 0,       # All stock is okay
+                "VCP": 3
+            }
+
+            filtered_dfs = []
             for df, mapping, company, fname in file_data:
                 df = df.copy()
                 df.rename(columns=mapping, inplace=True)
-                selected_cols = [v for v in mapping.values() if v != "(Leave Blank)"]
-                if not selected_cols:
-                    st.warning(f"No columns selected for {fname}; skipping this file.")
-                    continue
-                df = df[selected_cols]
-                df["COMPANY"] = company
-                df["HANDLING"] = COMPANY_OPTIONS[company]
-                df.reset_index(drop=True, inplace=True)
-                merged_dfs.append(df)
+                if "STOCK" in df.columns and company in stock_conditions:
+                    min_stock = stock_conditions[company]
+                    if min_stock > 0:
+                        df = df[df["STOCK"] >= min_stock]
+                filtered_dfs.append(df)
+
+            merged_dfs = filtered_dfs
+
             if merged_dfs:
                 merged_df = pd.concat(merged_dfs, ignore_index=True)
                 merged_df = merged_df.reindex(columns=[col for col in STANDARD_COLUMNS if col in merged_df.columns])
